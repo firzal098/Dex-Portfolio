@@ -13,7 +13,8 @@ import {
   ArrowRight,
   Maximize2,
   Github,
-  ExternalLink
+  ExternalLink,
+  Mail
 } from "lucide-react";
 import { translations, Language } from "./translations";
 import { WireframeDrone } from "./components/WireframeDrone";
@@ -251,43 +252,32 @@ export default function App() {
     };
   }, [hasEntered]);
 
-  // Contact form post
-  const handleFormSubmit = async (e: React.FormEvent) => {
+  // Contact form mailto redirect
+  const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formName.trim() || !formEmail.trim() || !formMessage.trim()) return;
 
     setFormStatus("sending");
 
-    try {
-      const response = await fetch("/api/contact", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: formName,
-          email: formEmail,
-          subject: formSubject || "Aesthetic Inquiry",
-          message: formMessage,
-          language,
-        }),
-      });
+    const mailSubject = encodeURIComponent(formSubject.trim() || "Portfolio Inquiry");
+    const mailBody = encodeURIComponent(
+      `From: ${formName.trim()} (${formEmail.trim()})\n\nMessage:\n${formMessage.trim()}`
+    );
+    const mailtoUrl = `mailto:me@firzal.space?subject=${mailSubject}&body=${mailBody}`;
 
-      const data = await response.json();
+    const redirectNotice =
+      language === "ja"
+        ? "メールクライアントにリダイレクトしています (me@firzal.space)..."
+        : language === "id"
+        ? "Anda akan diarahkan ke aplikasi email Anda untuk mengirim pesan ke me@firzal.space..."
+        : "You will be redirected to your default email client to send your message to me@firzal.space...";
 
-      if (response.ok && data.success) {
-        setFormStatus("success");
-        setFormResponseMsg(t.contactSuccess);
-        setFormName("");
-        setFormEmail("");
-        setFormSubject("");
-        setFormMessage("");
-      } else {
-        setFormStatus("error");
-        setFormResponseMsg(data.error || t.contactError);
-      }
-    } catch (err) {
-      setFormStatus("error");
-      setFormResponseMsg(t.contactError);
-    }
+    setFormResponseMsg(redirectNotice);
+
+    setTimeout(() => {
+      window.location.href = mailtoUrl;
+      setFormStatus("success");
+    }, 300);
   };
 
   return (
@@ -1460,20 +1450,34 @@ export default function App() {
         {/* SECTION 4: CONTACT ME (Clean geometric contact form) */}
         <section id="sector-contact" className="max-w-3xl mx-auto space-y-8">
           
-          <ScrollFade className="text-center space-y-2">
-            <span className="px-2 py-0.5 bg-white text-black font-mono text-[9px] tracking-widest uppercase border border-stone-200/50">
+          <ScrollFade className="text-center space-y-3">
+            <span className="px-2.5 py-1 bg-white text-black font-mono text-[9px] tracking-widest uppercase border border-stone-200/50">
               {language === "ja" ? "連絡を取る" : language === "id" ? "HUBUNGI SAYA" : "GET IN TOUCH"}
             </span>
             <h3 className="text-3xl md:text-4xl font-cinzel font-bold text-inherit uppercase leading-none tracking-wider">
               {t.contactTitle}
             </h3>
-            <p className="text-stone-400 text-xs md:text-sm font-sans">
+            <p className="text-stone-400 text-xs md:text-sm font-sans max-w-lg mx-auto">
               {language === "ja"
-                ? "フィルザルに直接メッセージを送信します。できるだけ早くお返事いたします。"
+                ? "フィルザル (me@firzal.space) に直接メッセージを送信します。できるだけ早くお返事いたします。"
                 : language === "id"
-                ? "Kirim pesan langsung ke Firzal. Saya akan membalas Anda secepat mungkin."
-                : "Send a direct message to Firzal. I will get back to you as soon as possible."}
+                ? "Kirim pesan langsung ke Firzal (me@firzal.space). Saya akan membalas Anda secepat mungkin."
+                : "Send a direct message to Firzal (me@firzal.space). I will get back to you as soon as possible."}
             </p>
+
+            {/* Target Email & Mailto Info Bar */}
+            <div className="pt-2 flex flex-wrap items-center justify-center gap-3 font-mono text-[10px]">
+              <a
+                href="mailto:me@firzal.space"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-sky-400/40 text-sky-400 bg-sky-400/10 hover:bg-sky-400 hover:text-black transition duration-300 font-bold tracking-wider"
+              >
+                <span>TARGET: me@firzal.space</span>
+                <Mail className="w-3 h-3" />
+              </a>
+              <span className="px-3 py-1.5 border border-stone-700/60 text-stone-400 bg-stone-900/40 tracking-wider">
+                OPENS DEFAULT MAIL CLIENT
+              </span>
+            </div>
           </ScrollFade>
 
           <ScrollFade delay={100}>
