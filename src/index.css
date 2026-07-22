@@ -1,0 +1,309 @@
+@import "tailwindcss";
+
+@theme {
+  --font-serif: "Playfair Display", Georgia, serif;
+  --font-cinzel: "Cinzel", Georgia, serif;
+  --font-sans: "Plus Jakarta Sans", sans-serif;
+  --font-mono: "Space Mono", monospace;
+}
+
+/* Custom utility animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Base custom font selection and smooth scrolls */
+html {
+  scroll-behavior: smooth;
+  font-family: var(--font-sans);
+}
+
+/* Stylize standard inputs to match dark retro terminal themes */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 0px;
+  background: currentColor;
+  cursor: pointer;
+}
+
+/* Technical scrollbars for the debug logs terminal */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.scrollbar-thin::-webkit-scrollbar-track:hover {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Additional SHAFT style visual details */
+.bg-grid-lines {
+  background-size: 40px 40px;
+  background-image: 
+    linear-gradient(to right, rgba(239, 68, 68, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(239, 68, 68, 0.05) 1px, transparent 1px);
+}
+
+.bg-grid-lines-inverted {
+  background-size: 40px 40px;
+  background-image: 
+    linear-gradient(to right, rgba(0, 0, 0, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.04) 1px, transparent 1px);
+}
+
+/* Glitch Slices and Arcane Keyframes */
+@keyframes glitchScanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+
+@keyframes glitchSlice {
+  0% { clip-path: inset(40% 0 61% 0); transform: skewX(-5deg); }
+  20% { clip-path: inset(92% 0 1% 0); transform: skewX(10deg); }
+  40% { clip-path: inset(15% 0 80% 0); transform: skewX(-15deg); }
+  60% { clip-path: inset(80% 0 5% 0); transform: skewX(5deg); }
+  80% { clip-path: inset(3% 0 92% 0); transform: skewX(20deg); }
+  100% { clip-path: inset(40% 0 61% 0); transform: skewX(-5deg); }
+}
+
+@keyframes spinClockwise {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes spinCounterClockwise {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
+}
+
+@keyframes irisAperture {
+  0% { transform: scale(0.1); opacity: 0; }
+  30% { transform: scale(1); opacity: 0.8; }
+  70% { transform: scale(1.1); opacity: 0.9; }
+  100% { transform: scale(4); opacity: 0; }
+}
+
+@keyframes slideFromTop {
+  0% {
+    transform: translateY(-50%);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideFromBottom {
+  0% {
+    transform: translateY(50%);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleDown {
+  0% {
+    transform: scale(1.5);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes scaleUp {
+  0% {
+    transform: scale(0.6);
+  }
+  100% {
+    transform: scale(1.2);
+  }
+}
+
+@keyframes circleScaleUp {
+  0% {
+    transform: scale(0.05);
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.85;
+  }
+  100% {
+    transform: scale(var(--target-scale, 1));
+    opacity: 1;
+  }
+}
+
+.animate-slide-from-top {
+  animation: slideFromTop 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-slide-from-bottom {
+  animation: slideFromBottom 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-scale-down {
+  animation: scaleDown 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-scale-up {
+  animation: scaleUp 0.85s cubic-bezier(0.5, 0, 0.75, 0) forwards;
+}
+
+.animate-glitch-scanline {
+  animation: glitchScanline 1.2s linear infinite;
+}
+
+.animate-glitch-slice {
+  animation: glitchSlice 0.3s steps(2) infinite;
+}
+
+.animate-spin-fast {
+  animation: spinClockwise 1s cubic-bezier(0.77, 0, 0.175, 1) infinite;
+}
+
+.animate-spin-slow-reverse {
+  animation: spinCounterClockwise 12s linear infinite;
+}
+
+.animate-spin-clock-hands {
+  animation: spinCounterClockwise 1.5s cubic-bezier(0.645, 0.045, 0.355, 1) infinite;
+}
+
+.animate-iris {
+  animation: irisAperture 0.75s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+@keyframes glitchVibrate {
+  0% { transform: translate(0, 0) skew(0deg); }
+  10% { transform: translate(-2px, 1px) skew(-1deg); }
+  20% { transform: translate(1px, -2px) skew(1deg); }
+  30% { transform: translate(-1px, -1px) skew(-0.5deg); }
+  40% { transform: translate(2px, 2px) skew(1.5deg); }
+  50% { transform: translate(-1px, 2px) skew(-1deg); }
+  60% { transform: translate(-2px, -1px) skew(0.5deg); }
+  70% { transform: translate(2px, -2px) skew(-1.5deg); }
+  80% { transform: translate(-1px, -1px) skew(1deg); }
+  90% { transform: translate(1px, 2px) skew(0deg); }
+  100% { transform: translate(0, 0) skew(0deg); }
+}
+
+.animate-glitch-vibrate {
+  animation: glitchVibrate 0.15s linear infinite;
+}
+
+@keyframes chromaticGlitch {
+  0% { text-shadow: -2px 0 0 #ef4444, 2px 0 0 #06b6d4; }
+  25% { text-shadow: 2px -1px 0 #ef4444, -2px 2px 0 #06b6d4; }
+  50% { text-shadow: -2px 2px 0 #ef4444, 2px -2px 0 #06b6d4; }
+  75% { text-shadow: 2px 2px 0 #ef4444, -2px -2px 0 #06b6d4; }
+  100% { text-shadow: -2px 0 0 #ef4444, 2px 0 0 #06b6d4; }
+}
+
+@keyframes flickerInversion {
+  0%, 100% { background-color: #02040a; }
+  45% { background-color: #02040a; }
+  50% { background-color: #0e122b; }
+  55% { background-color: #02040a; }
+  85% { background-color: #02040a; }
+  90% { background-color: #050b18; }
+  95% { background-color: #02040a; }
+}
+
+@keyframes runicFlicker {
+  0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% { opacity: 0.8; filter: drop-shadow(0 0 6px rgba(14, 165, 233, 0.5)); }
+  20%, 22%, 24%, 55% { opacity: 0.15; filter: none; }
+}
+
+.animate-chromatic {
+  animation: chromaticGlitch 0.2s linear infinite;
+}
+
+.animate-flicker-inversion {
+  animation: flickerInversion 1s ease-in-out infinite;
+}
+
+.animate-runic-flicker {
+  animation: runicFlicker 2.5s infinite;
+}
+
+@keyframes horizonLaserExpand {
+  0% {
+    height: 2px;
+    opacity: 0.5;
+    box-shadow: 0 0 10px #38bdf8;
+  }
+  40% {
+    height: 30px;
+    opacity: 0.65;
+    box-shadow: 0 0 35px #38bdf8, 0 0 70px rgba(56, 189, 248, 0.4);
+  }
+  80% {
+    height: 50vh;
+    opacity: 0.75;
+    box-shadow: 0 0 70px #38bdf8, 0 0 120px rgba(56, 189, 248, 0.3);
+  }
+  100% {
+    height: 90vh;
+    opacity: 0.8;
+    box-shadow: 0 0 100px #38bdf8, 0 0 160px rgba(56, 189, 248, 0.25);
+  }
+}
+
+@keyframes horizonScanCover {
+  0% {
+    opacity: 0.15;
+    transform: scaleY(0.1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scaleY(0.6);
+  }
+  100% {
+    opacity: 0.6;
+    transform: scaleY(1.1);
+  }
+}
+
+.animate-horizon-laser-expand {
+  animation: horizonLaserExpand 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-horizon-scan-cover {
+  animation: horizonScanCover 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+
+
+

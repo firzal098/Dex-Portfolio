@@ -1,0 +1,6 @@
+{
+  "name": "Firzal - Drone & AI Portfolio",
+  "description": "Interactive sci-fi portfolio for Firzal, a drone and AI engineering student, featuring an interactive 3D wireframe drone simulator, Mavlink telemetry dashboard, multi-language support (English, Indonesian, Japanese), and contact system.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
