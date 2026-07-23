@@ -83,26 +83,33 @@ export const KineticGears: React.FC<{ speed: number; isInverted: boolean }> = ({
       }
       ctx.stroke();
 
-      // Scannable crosshair markings "+" scattered across the screen
-      ctx.strokeStyle = blueAccentAlpha(0.20);
-      ctx.lineWidth = 1.2;
-      const ticks = [
-        { x: 100, y: 120 }, { x: w - 120, y: 150 },
-        { x: 280, y: 700 }, { x: w - 300, y: 1100 },
-        { x: w * 0.5, y: 500 }, { x: w * 0.35, y: 1600 }
-      ];
-      ticks.forEach((t) => {
-        // Offset Y by scroll position for visual scrolling lock
-        const drawY = t.y - scrollY;
-        if (drawY > -10 && drawY < h + 10) {
-          ctx.beginPath();
-          ctx.moveTo(t.x - 6, drawY);
-          ctx.lineTo(t.x + 6, drawY);
-          ctx.moveTo(t.x, drawY - 6);
-          ctx.lineTo(t.x, drawY + 6);
-          ctx.stroke();
-        }
-      });
+      // Scannable crosshairs "+" scattered across screen - only on larger screens
+      const isMobile = w < 768;
+      const isLaptop = w >= 768 && w < 1280;
+
+      if (!isMobile) {
+        ctx.strokeStyle = blueAccentAlpha(0.20);
+        ctx.lineWidth = 1.2;
+        const ticks = isLaptop ? [
+          { x: 100, y: 120 }, { x: w - 120, y: 150 }
+        ] : [
+          { x: 100, y: 120 }, { x: w - 120, y: 150 },
+          { x: 280, y: 700 }, { x: w - 300, y: 1100 },
+          { x: w * 0.5, y: 500 }, { x: w * 0.35, y: 1600 }
+        ];
+        ticks.forEach((t) => {
+          // Offset Y by scroll position for visual scrolling lock
+          const drawY = t.y - scrollY;
+          if (drawY > -10 && drawY < h + 10) {
+            ctx.beginPath();
+            ctx.moveTo(t.x - 6, drawY);
+            ctx.lineTo(t.x + 6, drawY);
+            ctx.moveTo(t.x, drawY - 6);
+            ctx.lineTo(t.x, drawY + 6);
+            ctx.stroke();
+          }
+        });
+      }
 
       // ==========================================
       // GEOMETRIC & GEAR ARTWORK DRAWING FUNCTIONS
@@ -689,111 +696,117 @@ export const KineticGears: React.FC<{ speed: number; isInverted: boolean }> = ({
       // LAYERING ARCANE GEOMETRIES SCROLLABLE TIMELINE
       // ==============================================
 
-      // STATIC & INTERCONNECTED CELESTIAL BEAMS (The busy coordinate web!)
-      drawConnectingBeam(w * 0.5, 450, w * 0.5, 1250, blueAccentAlpha(0.05)); // Central vertical line from Section 1 to Section 2
-      drawConnectingBeam(100, 300, w * 0.5, 450, blueAccentAlpha(0.04));    // Left gear to central Metatron's Cube
-      drawConnectingBeam(w - 180, 280, w * 0.5, 450, blueAccentAlpha(0.04));  // Right seed to central Metatron's Cube
-      drawConnectingBeam(w * 0.5, 1250, w * 0.25, 2150, blueAccentAlpha(0.04)); // Astrolabe to Section 3 Seed Left
-      drawConnectingBeam(w * 0.5, 1250, w * 0.75, 2150, blueAccentAlpha(0.04)); // Astrolabe to Section 3 Gear Right
-      drawConnectingBeam(w * 0.25, 2150, w * 0.75, 2150, blueAccentAlpha(0.03)); // Left Seed to Right Gear in Section 3
-      drawConnectingBeam(w * 0.75, 2150, w * 0.5, 3100, blueAccentAlpha(0.04)); // Section 3 Gear to Section 4 Heptagram
-      drawConnectingBeam(w * 0.5, 3100, w * 0.5 - 150, 3250, blueAccentAlpha(0.03)); // Heptagram to Supporting Gears
-      drawConnectingBeam(w * 0.5, 3100, w * 0.5 + 150, 3250, blueAccentAlpha(0.03));
-      drawConnectingBeam(150, 650, w * 0.5, 450, blueAccentAlpha(0.03));
-      drawConnectingBeam(w - 180, 680, w * 0.5, 450, blueAccentAlpha(0.03));
+      // STATIC & INTERCONNECTED CELESTIAL BEAMS
+      if (!isMobile) {
+        if (isLaptop) {
+          drawConnectingBeam(w * 0.5, 450, w * 0.5, 1250, blueAccentAlpha(0.03));
+          drawConnectingBeam(w * 0.5, 1250, w * 0.5, 2150, blueAccentAlpha(0.03));
+        } else {
+          drawConnectingBeam(w * 0.5, 450, w * 0.5, 1250, blueAccentAlpha(0.05));
+          drawConnectingBeam(100, 300, w * 0.5, 450, blueAccentAlpha(0.04));
+          drawConnectingBeam(w - 180, 280, w * 0.5, 450, blueAccentAlpha(0.04));
+          drawConnectingBeam(w * 0.5, 1250, w * 0.25, 2150, blueAccentAlpha(0.04));
+          drawConnectingBeam(w * 0.5, 1250, w * 0.75, 2150, blueAccentAlpha(0.04));
+          drawConnectingBeam(w * 0.25, 2150, w * 0.75, 2150, blueAccentAlpha(0.03));
+          drawConnectingBeam(w * 0.75, 2150, w * 0.5, 3100, blueAccentAlpha(0.04));
+          drawConnectingBeam(w * 0.5, 3100, w * 0.5 - 150, 3250, blueAccentAlpha(0.03));
+          drawConnectingBeam(w * 0.5, 3100, w * 0.5 + 150, 3250, blueAccentAlpha(0.03));
+          drawConnectingBeam(150, 650, w * 0.5, 450, blueAccentAlpha(0.03));
+          drawConnectingBeam(w - 180, 680, w * 0.5, 450, blueAccentAlpha(0.03));
+        }
+      }
 
       // SECTION 1 (Intro Page / Hero Room: Y = 0 to 900)
-      // Enormous background Roman numeral clock face
-      drawRomanNumeralClockBackground(w * 0.5, 450, 440, blueAccentAlpha(0.045), localRotation * -0.05);
-
-      // Gigantic central Metatron's Cube right behind the hero title
-      drawMetatronsCube(w * 0.5, 450, 240, blueAccentAlpha(0.06), localRotation * 0.1);
-
-      // Top-Center crown gear assembly above hero
-      drawComplexGear(w * 0.5, 110, 65, 52, 14, localRotation * -1.4, gearColorMain, "spokes");
-      drawComplexGear(w * 0.5 - 110, 95, 45, 36, 10, localRotation * 2.0, gearColorSecondary, "simple");
-      drawComplexGear(w * 0.5 + 110, 95, 45, 36, 10, localRotation * 2.0, gearColorSecondary, "simple");
-
-      // Left-margin gear interlocking triple train (highly detailed paper-cut look)
-      drawComplexGear(100, 300, 85, 72, 18, localRotation * 1.2, gearColorSecondary, "rings");
-      drawComplexGear(100 + 130, 360, 55, 44, 12, localRotation * -1.8, gearColorMain, "spokes");
-      drawComplexGear(100 + 130 + 85, 420, 38, 30, 8, localRotation * 2.6, gearColorSecondary, "simple");
-
-      // Right-margin floating Seed of Life & gear train
-      drawSeedOfLife(w - 180, 280, 75, blueAccentAlpha(0.07), localRotation * -0.2);
-      drawComplexGear(w - 120, 380, 65, 53, 14, localRotation * 1.5, gearColorMain, "plate");
-      drawComplexGear(w - 220, 430, 42, 34, 9, localRotation * -2.3, gearColorSecondary, "spokes");
-
-      // Overlapping 10-pointed star near top right
-      drawDecagram(w - 120, 150, 60, blueAccentAlpha(0.04), localRotation * 0.3);
-
-      // Bottom-left & Bottom-right hero support gear assemblies
-      drawComplexGear(140, 680, 95, 80, 20, localRotation * -0.9, gearColorMain, "rings");
-      drawComplexGear(250, 740, 50, 40, 11, localRotation * 1.7, gearColorSecondary, "spokes");
-
-      drawComplexGear(w - 160, 680, 90, 75, 18, localRotation * 1.0, gearColorSecondary, "plate");
-      drawComplexGear(w - 270, 740, 52, 42, 11, localRotation * -1.7, gearColorMain, "simple");
-
+      if (isMobile) {
+        // Mobile: Minimal elegant crown gear
+        drawComplexGear(w * 0.5, 120, 50, 40, 10, localRotation * -1.2, gearColorMain, "simple");
+      } else if (isLaptop) {
+        // Laptop: Clean hero setup - Metatron's cube + primary crown & subtle side gears
+        drawMetatronsCube(w * 0.5, 450, 180, blueAccentAlpha(0.04), localRotation * 0.08);
+        drawComplexGear(w * 0.5, 110, 55, 44, 12, localRotation * -1.4, gearColorMain, "spokes");
+        drawComplexGear(70, 300, 60, 48, 12, localRotation * 1.2, gearColorSecondary, "rings");
+        drawComplexGear(w - 90, 300, 55, 44, 11, localRotation * -1.2, gearColorSecondary, "plate");
+      } else {
+        // Desktop: Full elaborate hero artwork
+        drawRomanNumeralClockBackground(w * 0.5, 450, 440, blueAccentAlpha(0.045), localRotation * -0.05);
+        drawMetatronsCube(w * 0.5, 450, 240, blueAccentAlpha(0.06), localRotation * 0.1);
+        drawComplexGear(w * 0.5, 110, 65, 52, 14, localRotation * -1.4, gearColorMain, "spokes");
+        drawComplexGear(w * 0.5 - 110, 95, 45, 36, 10, localRotation * 2.0, gearColorSecondary, "simple");
+        drawComplexGear(w * 0.5 + 110, 95, 45, 36, 10, localRotation * 2.0, gearColorSecondary, "simple");
+        drawComplexGear(100, 300, 85, 72, 18, localRotation * 1.2, gearColorSecondary, "rings");
+        drawComplexGear(100 + 130, 360, 55, 44, 12, localRotation * -1.8, gearColorMain, "spokes");
+        drawComplexGear(100 + 130 + 85, 420, 38, 30, 8, localRotation * 2.6, gearColorSecondary, "simple");
+        drawSeedOfLife(w - 180, 280, 75, blueAccentAlpha(0.07), localRotation * -0.2);
+        drawComplexGear(w - 120, 380, 65, 53, 14, localRotation * 1.5, gearColorMain, "plate");
+        drawComplexGear(w - 220, 430, 42, 34, 9, localRotation * -2.3, gearColorSecondary, "spokes");
+        drawDecagram(w - 120, 150, 60, blueAccentAlpha(0.04), localRotation * 0.3);
+        drawComplexGear(140, 680, 95, 80, 20, localRotation * -0.9, gearColorMain, "rings");
+        drawComplexGear(250, 740, 50, 40, 11, localRotation * 1.7, gearColorSecondary, "spokes");
+        drawComplexGear(w - 160, 680, 90, 75, 18, localRotation * 1.0, gearColorSecondary, "plate");
+        drawComplexGear(w - 270, 740, 52, 42, 11, localRotation * -1.7, gearColorMain, "simple");
+      }
 
       // SECTION 2 (Flight Simulator / Central Rotator Sector: Y = 1000 to 1900)
-      // Enormous background Roman numeral clock face
-      drawRomanNumeralClockBackground(w * 0.5, 1250, 420, blueAccentAlpha(0.035), localRotation * 0.08);
-
-      // Highly-detailed Alchemical Astrolabe Clock behind the flight rotators
-      drawAlchemicalAstrolabe(w * 0.5, 1250, 260, blueAccentAlpha(0.08), localRotation);
-
-      // Support gears interlocking from the left & right sides (4-gear mechanical bank)
-      drawComplexGear(w * 0.5 - 320, 1250, 75, 63, 16, localRotation * -1.3, gearColorMain, "plate");
-      drawComplexGear(w * 0.5 - 435, 1190, 50, 40, 11, localRotation * 1.95, gearColorSecondary, "spokes");
-      drawComplexGear(w * 0.5 - 435, 1310, 50, 40, 11, localRotation * 1.95, gearColorSecondary, "rings");
-
-      drawComplexGear(w * 0.5 + 320, 1250, 75, 63, 16, localRotation * -1.3, gearColorMain, "plate");
-      drawComplexGear(w * 0.5 + 435, 1190, 50, 40, 11, localRotation * 1.95, gearColorSecondary, "spokes");
-      drawComplexGear(w * 0.5 + 435, 1310, 50, 40, 11, localRotation * 1.95, gearColorSecondary, "rings");
-
-      // Two overlapping Vesica Piscis lenses surrounding the Astrolabe
-      drawVesicaPiscis(w * 0.5 - 550, 1250, 100, blueAccentAlpha(0.05), localRotation * -0.25);
-      drawVesicaPiscis(w * 0.5 + 550, 1250, 100, blueAccentAlpha(0.05), localRotation * 0.25);
-
+      if (isMobile) {
+        // Mobile: Single central astrolabe core
+        drawAlchemicalAstrolabe(w * 0.5, 1250, 140, blueAccentAlpha(0.05), localRotation);
+      } else if (isLaptop) {
+        // Laptop: Astrolabe + 1 gear on each side
+        drawAlchemicalAstrolabe(w * 0.5, 1250, 200, blueAccentAlpha(0.06), localRotation);
+        drawComplexGear(w * 0.5 - 260, 1250, 55, 44, 12, localRotation * -1.3, gearColorMain, "plate");
+        drawComplexGear(w * 0.5 + 260, 1250, 55, 44, 12, localRotation * -1.3, gearColorMain, "plate");
+      } else {
+        // Desktop: Full astrolabe clock, Roman clock, 6 side gears, Vesica Piscis
+        drawRomanNumeralClockBackground(w * 0.5, 1250, 420, blueAccentAlpha(0.035), localRotation * 0.08);
+        drawAlchemicalAstrolabe(w * 0.5, 1250, 260, blueAccentAlpha(0.08), localRotation);
+        drawComplexGear(w * 0.5 - 320, 1250, 75, 63, 16, localRotation * -1.3, gearColorMain, "plate");
+        drawComplexGear(w * 0.5 - 435, 1190, 50, 40, 11, localRotation * 1.95, gearColorSecondary, "spokes");
+        drawComplexGear(w * 0.5 - 435, 1310, 50, 40, 11, localRotation * 1.95, gearColorSecondary, "rings");
+        drawComplexGear(w * 0.5 + 320, 1250, 75, 63, 16, localRotation * -1.3, gearColorMain, "plate");
+        drawComplexGear(w * 0.5 + 435, 1190, 50, 40, 11, localRotation * 1.95, gearColorSecondary, "spokes");
+        drawComplexGear(w * 0.5 + 435, 1310, 50, 40, 11, localRotation * 1.95, gearColorSecondary, "rings");
+        drawVesicaPiscis(w * 0.5 - 550, 1250, 100, blueAccentAlpha(0.05), localRotation * -0.25);
+        drawVesicaPiscis(w * 0.5 + 550, 1250, 100, blueAccentAlpha(0.05), localRotation * 0.25);
+      }
 
       // SECTION 3 (Timeline / Projects Grid Room: Y = 2000 to 2900)
-      // Enormous background Roman numeral clock face
-      drawRomanNumeralClockBackground(w * 0.35, 2250, 360, blueAccentAlpha(0.03), localRotation * -0.06);
-
-      // Double interlocking Seed of Life gears representing continuous time streams
-      drawSeedOfLife(w * 0.25, 2150, 90, blueAccentAlpha(0.06), localRotation * 0.35);
-      drawComplexGear(w * 0.25 - 130, 2150, 60, 48, 13, localRotation * -0.5, gearColorMain, "spokes");
-      
-      // Calibrated chronological timeline gear mechanism
-      drawComplexGear(w * 0.75, 2150, 110, 95, 24, localRotation * 0.7, gearColorSecondary, "rings");
-      drawComplexGear(w * 0.75 - 150, 2150, 50, 40, 12, localRotation * -1.54, gearColorMain, "simple");
-      drawComplexGear(w * 0.75 + 150, 2150, 50, 40, 12, localRotation * -1.54, gearColorMain, "plate");
-
-      // Floating Decagram star & gears aligning with Section 3 margins
-      drawDecagram(120, 2450, 80, blueAccentAlpha(0.05), localRotation * -0.12);
-      drawComplexGear(120, 2580, 60, 48, 12, localRotation * 1.2, gearColorSecondary, "spokes");
-      drawVesicaPiscis(w - 140, 2350, 70, blueAccentAlpha(0.04), localRotation * 0.2);
-      drawComplexGear(w - 140, 2480, 65, 52, 14, localRotation * -1.1, gearColorMain, "rings");
-
+      if (isMobile) {
+        drawComplexGear(w * 0.5, 2150, 50, 40, 12, localRotation * 0.7, gearColorSecondary, "rings");
+      } else if (isLaptop) {
+        drawSeedOfLife(w * 0.2, 2150, 60, blueAccentAlpha(0.05), localRotation * 0.35);
+        drawComplexGear(w * 0.8, 2150, 70, 58, 16, localRotation * 0.7, gearColorSecondary, "rings");
+      } else {
+        drawRomanNumeralClockBackground(w * 0.35, 2250, 360, blueAccentAlpha(0.03), localRotation * -0.06);
+        drawSeedOfLife(w * 0.25, 2150, 90, blueAccentAlpha(0.06), localRotation * 0.35);
+        drawComplexGear(w * 0.25 - 130, 2150, 60, 48, 13, localRotation * -0.5, gearColorMain, "spokes");
+        drawComplexGear(w * 0.75, 2150, 110, 95, 24, localRotation * 0.7, gearColorSecondary, "rings");
+        drawComplexGear(w * 0.75 - 150, 2150, 50, 40, 12, localRotation * -1.54, gearColorMain, "simple");
+        drawComplexGear(w * 0.75 + 150, 2150, 50, 40, 12, localRotation * -1.54, gearColorMain, "plate");
+        drawDecagram(120, 2450, 80, blueAccentAlpha(0.05), localRotation * -0.12);
+        drawComplexGear(120, 2580, 60, 48, 12, localRotation * 1.2, gearColorSecondary, "spokes");
+        drawVesicaPiscis(w - 140, 2350, 70, blueAccentAlpha(0.04), localRotation * 0.2);
+        drawComplexGear(w - 140, 2480, 65, 52, 14, localRotation * -1.1, gearColorMain, "rings");
+      }
 
       // SECTION 4 (About Me / Terminal & Footer Area: Y = 3000 to 4200)
-      // Enormous background Roman numeral clock face
-      drawRomanNumeralClockBackground(w * 0.5, 3100, 410, blueAccentAlpha(0.04), localRotation * 0.05);
-
-      // Grand Heptagram Seal (7 cosmic bodies alignment)
-      drawHeptagramSeal(w * 0.5, 3100, 220, blueAccentAlpha(0.07), localRotation * -0.15);
-
-      // Majestic gears acting as foundational bases supporting the seal
-      drawComplexGear(w * 0.5 - 150, 3250, 80, 68, 18, localRotation * 1.0, gearColorMain, "spokes");
-      drawComplexGear(w * 0.5 + 150, 3250, 80, 68, 18, localRotation * -1.0, gearColorSecondary, "plate");
-      drawComplexGear(w * 0.5 - 280, 3320, 55, 44, 12, localRotation * -1.45, gearColorSecondary, "simple");
-      drawComplexGear(w * 0.5 + 280, 3320, 55, 44, 12, localRotation * 1.45, gearColorMain, "simple");
-
-      // Double interlocking rings & gear anchors in footer zone
-      drawVesicaPiscis(w * 0.15, 3500, 110, blueAccentAlpha(0.05), localRotation * 0.15);
-      drawComplexGear(w * 0.15 + 130, 3500, 55, 44, 12, localRotation * -1.3, gearColorMain, "spokes");
-      drawDecagram(w * 0.85, 3500, 110, blueAccentAlpha(0.05), localRotation * -0.15);
-      drawComplexGear(w * 0.85 - 130, 3500, 55, 44, 12, localRotation * 1.3, gearColorSecondary, "rings");
+      if (isMobile) {
+        drawHeptagramSeal(w * 0.5, 3100, 120, blueAccentAlpha(0.04), localRotation * -0.15);
+      } else if (isLaptop) {
+        drawHeptagramSeal(w * 0.5, 3100, 160, blueAccentAlpha(0.05), localRotation * -0.15);
+        drawComplexGear(w * 0.5 - 120, 3250, 60, 50, 14, localRotation * 1.0, gearColorMain, "spokes");
+        drawComplexGear(w * 0.5 + 120, 3250, 60, 50, 14, localRotation * -1.0, gearColorSecondary, "plate");
+      } else {
+        drawRomanNumeralClockBackground(w * 0.5, 3100, 410, blueAccentAlpha(0.04), localRotation * 0.05);
+        drawHeptagramSeal(w * 0.5, 3100, 220, blueAccentAlpha(0.07), localRotation * -0.15);
+        drawComplexGear(w * 0.5 - 150, 3250, 80, 68, 18, localRotation * 1.0, gearColorMain, "spokes");
+        drawComplexGear(w * 0.5 + 150, 3250, 80, 68, 18, localRotation * -1.0, gearColorSecondary, "plate");
+        drawComplexGear(w * 0.5 - 280, 3320, 55, 44, 12, localRotation * -1.45, gearColorSecondary, "simple");
+        drawComplexGear(w * 0.5 + 280, 3320, 55, 44, 12, localRotation * 1.45, gearColorMain, "simple");
+        drawVesicaPiscis(w * 0.15, 3500, 110, blueAccentAlpha(0.05), localRotation * 0.15);
+        drawComplexGear(w * 0.15 + 130, 3500, 55, 44, 12, localRotation * -1.3, gearColorMain, "spokes");
+        drawDecagram(w * 0.85, 3500, 110, blueAccentAlpha(0.05), localRotation * -0.15);
+        drawComplexGear(w * 0.85 - 130, 3500, 55, 44, 12, localRotation * 1.3, gearColorSecondary, "rings");
+      }
 
 
       // HORIZON LASER SCAN SWEEP ON SCROLL

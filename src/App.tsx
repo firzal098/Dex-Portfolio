@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Sparkles,
   Play,
@@ -207,9 +207,9 @@ export default function App() {
   const [scrollPercent, setScrollPercent] = useState(0);
   const [activeSector, setActiveSector] = useState("01 // APEX_OVERVIEW");
 
-  const handleTelemetryUpdate = (newTelemetry: typeof telemetry) => {
+  const handleTelemetryUpdate = useCallback((newTelemetry: typeof telemetry) => {
     setTelemetry(newTelemetry);
-  };
+  }, []);
 
   // Scroll depth tracking
   useEffect(() => {
@@ -308,43 +308,43 @@ export default function App() {
           
           {/* Intricate high-tech blueprint overlay systems - strictly cool slate and blue */}
           <div className="absolute inset-0 pointer-events-none opacity-65">
-            {/* Central rotating vector dials */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] border border-sky-400/30 rounded-full animate-spin" style={{ animationDuration: "120s" }} />
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[680px] h-[680px] border border-dashed border-sky-400/20 rounded-full animate-spin" style={{ animationDuration: "90s" }} />
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] border border-sky-300/30 rounded-full animate-spin" style={{ animationDuration: "45s" }} />
+            {/* Central rotating vector dials - scaled appropriately for screen size */}
+            <div className="hidden lg:block absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] xl:w-[700px] h-[600px] xl:h-[700px] border border-sky-400/30 rounded-full animate-spin" style={{ animationDuration: "120s" }} />
+            <div className="hidden xl:block absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[680px] h-[680px] border border-dashed border-sky-400/20 rounded-full animate-spin" style={{ animationDuration: "90s" }} />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[280px] sm:w-[360px] md:w-[400px] h-[280px] sm:h-[360px] md:h-[400px] border border-sky-300/30 rounded-full animate-spin" style={{ animationDuration: "45s" }} />
             
-            {/* Major alignment grid crosshair markings */}
-            <div className="absolute top-12 left-12 font-mono text-[9px] text-sky-300/80 space-y-1">
+            {/* Major alignment grid crosshair markings - visible on medium+ screens */}
+            <div className="hidden md:block absolute top-12 left-12 font-mono text-[9px] text-sky-300/80 space-y-1">
               <p>GRID_SYS_SEC: // ALPHA-03</p>
               <p>CHRONO_LOCK: ARMED</p>
               <p>COORD: 34.0522° N, 118.2437° W</p>
               <p className="text-stone-400">REF_ID: 0x8FA92B2D</p>
             </div>
             
-            <div className="absolute top-12 right-12 font-mono text-[9px] text-sky-300/80 text-right space-y-1">
+            <div className="hidden lg:block absolute top-12 right-12 font-mono text-[9px] text-sky-300/80 text-right space-y-1">
               <p>BEARING: 184.22° SSE</p>
               <p>TIME_STYLIZATION_RATIO: 1.000</p>
               <p>HZ_STREAM: 60FPS // V-SYNC</p>
               <p className="text-stone-400">ENGINE_VERSION: V2.1.0_PROT</p>
             </div>
 
-            <div className="absolute bottom-12 right-12 font-mono text-[9px] text-sky-300/80 text-right space-y-1">
+            <div className="hidden lg:block absolute bottom-12 right-12 font-mono text-[9px] text-sky-300/80 text-right space-y-1">
               <p>STATUS: SYSTEM_STABILIZED</p>
               <p>NOISE_INTERPOLATOR: ENABLED</p>
               <p>CHRONOS_COEFFICIENT: 1.4142</p>
             </div>
 
             {/* Additional decorative tech lines and ticks */}
-            <div className="absolute top-1/4 left-10 w-20 h-px bg-sky-400/50" />
-            <div className="absolute top-1/4 left-10 h-8 w-px bg-sky-400/50" />
-            <div className="absolute bottom-1/4 right-10 w-20 h-px bg-sky-400/50" />
-            <div className="absolute bottom-1/4 right-10 h-8 w-px bg-sky-400/50" />
+            <div className="hidden md:block absolute top-1/4 left-10 w-20 h-px bg-sky-400/50" />
+            <div className="hidden md:block absolute top-1/4 left-10 h-8 w-px bg-sky-400/50" />
+            <div className="hidden md:block absolute bottom-1/4 right-10 w-20 h-px bg-sky-400/50" />
+            <div className="hidden md:block absolute bottom-1/4 right-10 h-8 w-px bg-sky-400/50" />
 
-            {/* Concentric rings in quadrants */}
-            <div className="absolute -top-40 -left-40 w-80 h-80 border border-sky-400/20 rounded-full" />
-            <div className="absolute -top-40 -left-40 w-96 h-96 border border-dashed border-sky-400/20 rounded-full" />
-            <div className="absolute -bottom-40 -right-40 w-80 h-80 border border-sky-400/20 rounded-full" />
-            <div className="absolute -bottom-40 -right-40 w-96 h-96 border border-dashed border-sky-400/20 rounded-full" />
+            {/* Concentric rings in quadrants - hidden on smaller screens */}
+            <div className="hidden xl:block absolute -top-40 -left-40 w-80 h-80 border border-sky-400/20 rounded-full" />
+            <div className="hidden xl:block absolute -top-40 -left-40 w-96 h-96 border border-dashed border-sky-400/20 rounded-full" />
+            <div className="hidden xl:block absolute -bottom-40 -right-40 w-80 h-80 border border-sky-400/20 rounded-full" />
+            <div className="hidden xl:block absolute -bottom-40 -right-40 w-96 h-96 border border-dashed border-sky-400/20 rounded-full" />
           </div>
 
           {/* Dramatic high-contrast SHAFT color cards in background - subtle blue/slate tints */}
@@ -1031,7 +1031,7 @@ export default function App() {
           <ScrollFade delay={100} className="lg:col-span-6 flex flex-col gap-4 relative z-10">
             
             {/* Elegant container layout with absolute border rules */}
-            <div className={`h-[380px] md:h-[450px] border relative transition-all duration-500 group ${
+            <div className={`h-[320px] sm:h-[380px] md:h-[450px] border relative transition-all duration-500 group overflow-hidden touch-none select-none ${
               isInverted 
                 ? "border-stone-300 bg-[#faf9f6] hover:border-sky-500 hover:shadow-[0_10px_30px_rgba(14,165,233,0.18)]" 
                 : "border-stone-800/80 bg-[#070b14]/70 backdrop-blur-md hover:border-sky-400/80 hover:shadow-[0_0_30px_rgba(56,189,248,0.22)]"

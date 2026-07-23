@@ -32,12 +32,22 @@ export const WireframeDrone: React.FC<WireframeDroneProps> = ({
   onTelemetryUpdate,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  
-  // Camera perspective settings
-  const [cameraRot, setCameraRot] = useState({ pitch: 0.4, yaw: 0.5 });
-  const [zoom, setZoom] = useState(7.0);
-  const isDragging = useRef(false);
-  const previousMousePosition = useRef({ x: 0, y: 0 });
+
+  // Camera perspective settings stored in refs to prevent React state re-render loops during 60fps animation
+  const cameraRot = useRef({ pitch: 0.35, yaw: 0.45 });
+  const zoom = useRef(6.5);
+
+  // Stable callback ref for telemetry updates
+  const onTelemetryUpdateRef = useRef(onTelemetryUpdate);
+  useEffect(() => {
+    onTelemetryUpdateRef.current = onTelemetryUpdate;
+  }, [onTelemetryUpdate]);
+
+  // Pointer & Touch gesture tracking
+  const pointers = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const previousPointerPos = useRef<{ x: number; y: number } | null>(null);
+  const previousPinchDistance = useRef<number | null>(null);
+  const isInteracting = useRef(false);
 
   // Physics & Animation internal states
   const droneState = useRef({
@@ -53,34 +63,85 @@ export const WireframeDrone: React.FC<WireframeDroneProps> = ({
     targetSpeed: 5.0,
   });
 
-  // Handle Drag & Orbit
-  const handleMouseDown = (e: React.MouseEvent) => {
-    isDragging.current = true;
-    previousMousePosition.current = { x: e.clientX, y: e.clientY };
+  // Unified Pointer Down (Mouse & Touch)
+  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    try {
+      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    } catch (_) {}
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    isInteracting.current = true;
+
+    if (pointers.current.size === 1) {
+      previousPointerPos.current = { x: e.clientX, y: e.clientY };
+    } else if (pointers.current.size === 2) {
+      const pList: { x: number; y: number }[] = Array.from(pointers.current.values());
+      previousPinchDistance.current = Math.hypot(pList[0].x - pList[1].x, pList[0].y - pList[1].y);
+    }
   };
 
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging.current) return;
-    const deltaX = e.clientX - previousMousePosition.current.x;
-    const deltaY = e.clientY - previousMousePosition.current.y;
+  // Unified Pointer Move (Single drag to orbit, multi touch pinch to zoom)
+  const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!pointers.current.has(e.pointerId)) return;
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
-    setCameraRot((prev) => ({
-      pitch: Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, prev.pitch + deltaY * 0.007)),
-      yaw: prev.yaw + deltaX * 0.007,
-    }));
+    const pList: { x: number; y: number }[] = Array.from(pointers.current.values());
 
-    previousMousePosition.current = { x: e.clientX, y: e.clientY };
+    if (pList.length === 1 && previousPointerPos.current) {
+      const deltaX = e.clientX - previousPointerPos.current.x;
+      const deltaY = e.clientY - previousPointerPos.current.y;
+
+      cameraRot.current.pitch = Math.max(
+        -Math.PI / 2.2,
+        Math.min(Math.PI / 2.2, cameraRot.current.pitch + deltaY * 0.006)
+      );
+      cameraRot.current.yaw += deltaX * 0.006;
+
+      previousPointerPos.current = { x: e.clientX, y: e.clientY };
+    } else if (pList.length === 2) {
+      const currentDist = Math.hypot(pList[0].x - pList[1].x, pList[0].y - pList[1].y);
+      if (previousPinchDistance.current !== null && previousPinchDistance.current > 0) {
+        const deltaDist = currentDist - previousPinchDistance.current;
+        zoom.current = Math.max(2.5, Math.min(16.0, zoom.current - deltaDist * 0.025));
+      }
+      previousPinchDistance.current = currentDist;
+    }
   };
 
-  const handleMouseUpOrLeave = () => {
-    isDragging.current = false;
+  // Unified Pointer Up or Cancel
+  const handlePointerUpOrCancel = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    try {
+      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch (_) {}
+    pointers.current.delete(e.pointerId);
+
+    if (pointers.current.size < 2) {
+      previousPinchDistance.current = null;
+    }
+    if (pointers.current.size === 1) {
+      const remaining = Array.from(pointers.current.values())[0] as { x: number; y: number };
+      previousPointerPos.current = { x: remaining.x, y: remaining.y };
+    } else if (pointers.current.size === 0) {
+      isInteracting.current = false;
+      previousPointerPos.current = null;
+    }
   };
 
-  // Zoom control
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    setZoom((prev) => Math.max(3.0, Math.min(15.0, prev + e.deltaY * 0.005)));
-  };
+  // Attach non-passive wheel listener directly to canvas for smooth trackpad zooming
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const zoomChange = e.deltaY * 0.003;
+      zoom.current = Math.max(2.5, Math.min(16.0, zoom.current + zoomChange));
+    };
+
+    canvas.addEventListener("wheel", onWheel, { passive: false });
+    return () => {
+      canvas.removeEventListener("wheel", onWheel);
+    };
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -90,14 +151,13 @@ export const WireframeDrone: React.FC<WireframeDroneProps> = ({
 
     let animationId: number;
 
-    // Upgraded 3D Vertices for a High-Fidelity Drone
-    // Dual-deck chassis plates
+    // Upgraded 3D Vertices for High-Fidelity Drone
     const upperDeck: Point3D[] = [
       { x: -5, y: -9, z: -2 }, // Nose
       { x: 5, y: -9, z: -2 },
-      { x: 8, y: -3, z: -3 },  // Mid outer
+      { x: 8, y: -3, z: -3 }, // Mid outer
       { x: 8, y: 3, z: -3 },
-      { x: 4, y: 9, z: -1.5 },  // Tail
+      { x: 4, y: 9, z: -1.5 }, // Tail
       { x: -4, y: 9, z: -1.5 },
       { x: -8, y: 3, z: -3 },
       { x: -8, y: -3, z: -3 },
@@ -114,7 +174,6 @@ export const WireframeDrone: React.FC<WireframeDroneProps> = ({
       { x: -6, y: -3, z: 3 },
     ];
 
-    // Under-body Battery pack
     const batteryPack: Point3D[] = [
       { x: -3, y: -5, z: 3 },
       { x: 3, y: -5, z: 3 },
@@ -126,96 +185,103 @@ export const WireframeDrone: React.FC<WireframeDroneProps> = ({
       { x: -3, y: 6, z: 7 },
     ];
 
-    // Motor Hub centers (X-Configuration, wide layout)
     const armEndpoints = {
-      fl: { x: -25, y: -23, z: -1 }, // Front Left
-      fr: { x: 25, y: -23, z: -1 },  // Front Right
-      rl: { x: -25, y: 23, z: 1 },   // Rear Left
-      rr: { x: 25, y: 23, z: 1 },    // Rear Right
+      fl: { x: -25, y: -23, z: -1 },
+      fr: { x: 25, y: -23, z: -1 },
+      rl: { x: -25, y: 23, z: 1 },
+      rr: { x: 25, y: 23, z: 1 },
     };
 
-    // Four landing stilts connecting to under-chassis
     const landingLegs = [
-      { start: { x: -5, y: -4, z: 3 }, joint: { x: -8, y: -5, z: 11 }, foot: { x: -9, y: -6, z: 12 } }, // FL
-      { start: { x: 5, y: -4, z: 3 }, joint: { x: 8, y: -5, z: 11 }, foot: { x: 9, y: -6, z: 12 } },  // FR
-      { start: { x: -5, y: 4, z: 3 }, joint: { x: -8, y: 5, z: 11 }, foot: { x: -9, y: 6, z: 12 } },  // RL
-      { start: { x: 5, y: 4, z: 3 }, joint: { x: 8, y: 5, z: 11 }, foot: { x: 9, y: 6, z: 12 } },   // RR
+      { start: { x: -5, y: -4, z: 3 }, joint: { x: -8, y: -5, z: 11 }, foot: { x: -9, y: -6, z: 12 } },
+      { start: { x: 5, y: -4, z: 3 }, joint: { x: 8, y: -5, z: 11 }, foot: { x: 9, y: -6, z: 12 } },
+      { start: { x: -5, y: 4, z: 3 }, joint: { x: -8, y: 5, z: 11 }, foot: { x: -9, y: 6, z: 12 } },
+      { start: { x: 5, y: 4, z: 3 }, joint: { x: 8, y: 5, z: 11 }, foot: { x: 9, y: 6, z: 12 } },
     ];
 
-    // Rotor spinner phase (in radians)
     let rotorPhase = 0;
 
+    // Responsive Canvas Size handling with ResizeObserver
     const resizeCanvas = () => {
+      if (!canvas || !canvas.parentElement) return;
       const parent = canvas.parentElement;
-      if (parent) {
-        canvas.width = parent.clientWidth * window.devicePixelRatio;
-        canvas.height = parent.clientHeight * window.devicePixelRatio;
-        canvas.style.width = `${parent.clientWidth}px`;
-        canvas.style.height = `${parent.clientHeight}px`;
+      const rect = parent.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+      if (rect.width > 0 && rect.height > 0) {
+        canvas.width = Math.floor(rect.width * dpr);
+        canvas.height = Math.floor(rect.height * dpr);
+        canvas.style.width = `${rect.width}px`;
+        canvas.style.height = `${rect.height}px`;
       }
     };
 
     resizeCanvas();
-    window.addEventListener("resize", resizeCanvas);
+    const resizeObserver = new ResizeObserver(() => resizeCanvas());
+    if (canvas.parentElement) {
+      resizeObserver.observe(canvas.parentElement);
+    }
 
-    // Main Simulation and Paint Loop
+    // Main Simulation & Paint Loop
     const render = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const scaleFactor = window.devicePixelRatio;
-      ctx.scale(scaleFactor, scaleFactor);
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      // CRITICAL FIX: Reset 2D transform matrix every frame to prevent exponential scaling on high-DPI displays!
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-      const w = canvas.width / scaleFactor;
-      const h = canvas.height / scaleFactor;
+      const w = canvas.width / dpr;
+      const h = canvas.height / dpr;
+
+      ctx.clearRect(0, 0, w, h);
+
       const centerX = w / 2;
-      const centerY = h / 2 + 10;
+      const centerY = h / 2 + 5;
 
-      // Dynamic theme checks for high contrast
-      const isDarkMode = document.documentElement.classList.contains("dark") || true; 
-      const strokeColorAlpha = (a: number) => `rgba(147, 197, 253, ${a})`; // Cool light blue signature accent
+      // Auto-scale zoom based on viewport dimensions so drone never spills off screen on mobile
+      const minDimension = Math.min(w, h);
+      const responsiveScale = Math.min(1.15, Math.max(0.55, minDimension / 420));
+      const effectiveZoom = zoom.current * responsiveScale;
+
+      const strokeColorAlpha = (a: number) => `rgba(147, 197, 253, ${a})`;
       const mainWireColor = (a: number) => `rgba(255, 255, 255, ${a})`;
-      
-      // Update Physics telemetry simulation based on Armed state
+
+      // Idle subtle auto-rotation when user is not interacting
+      if (!isInteracting.current) {
+        cameraRot.current.yaw += 0.0015;
+      }
+
+      // Update Physics telemetry simulation
       rotorPhase += 0.75;
       droneState.current.simTime += 0.016;
       const time = droneState.current.simTime;
 
-      if (true) {
-        // Drone state oscillation
-        droneState.current.targetAltitude = 12.0 + Math.sin(time * 1.5) * 3.5;
-        droneState.current.targetSpeed = 8.5 + Math.cos(time * 0.8) * 2.0;
+      // Drone state oscillation
+      droneState.current.targetAltitude = 12.0 + Math.sin(time * 1.5) * 3.5;
+      droneState.current.targetSpeed = 8.5 + Math.cos(time * 0.8) * 2.0;
 
-        const altitudeDiff = droneState.current.targetAltitude - droneState.current.altitude;
-        droneState.current.altitude += altitudeDiff * 0.04 * pidP;
+      const altitudeDiff = droneState.current.targetAltitude - droneState.current.altitude;
+      droneState.current.altitude += altitudeDiff * 0.04 * pidP;
 
-        const speedDiff = droneState.current.targetSpeed - droneState.current.speed;
-        droneState.current.speed += speedDiff * 0.03 * pidP;
+      const speedDiff = droneState.current.targetSpeed - droneState.current.speed;
+      droneState.current.speed += speedDiff * 0.03 * pidP;
 
-        const headingSin = Math.sin(time * 0.3);
-        droneState.current.heading = Math.round((90 + headingSin * 25 + 360) % 360);
+      const headingSin = Math.sin(time * 0.3);
+      droneState.current.heading = Math.round((90 + headingSin * 25 + 360) % 360);
 
-        const noise = (Math.sin(time * 35) * 0.06 + Math.cos(time * 50) * 0.04) / (pidD + 0.1);
-        droneState.current.pitch = Math.sin(time * 2.2) * 6 + (droneState.current.speed * 0.7) + noise * 8;
-        droneState.current.roll = Math.cos(time * 1.8) * 5 + (headingSin * 6) + noise * 8;
-        droneState.current.yaw = Math.sin(time * 0.6) * 10 + noise * 4;
+      const noise = (Math.sin(time * 35) * 0.06 + Math.cos(time * 50) * 0.04) / (pidD + 0.1);
+      droneState.current.pitch = Math.sin(time * 2.2) * 6 + droneState.current.speed * 0.7 + noise * 8;
+      droneState.current.roll = Math.cos(time * 1.8) * 5 + headingSin * 6 + noise * 8;
+      droneState.current.yaw = Math.sin(time * 0.6) * 10 + noise * 4;
 
-        const baselineRPM = 7500 + droneState.current.altitude * 60;
-        droneState.current.motorRPMs = [
-          Math.round(baselineRPM + Math.sin(time * 8) * 150 + (droneState.current.roll * 15)),
-          Math.round(baselineRPM + Math.cos(time * 8) * 150 - (droneState.current.roll * 15)),
-          Math.round(baselineRPM - Math.sin(time * 8) * 150 + (droneState.current.pitch * 15)),
-          Math.round(baselineRPM - Math.cos(time * 8) * 150 - (droneState.current.pitch * 15)),
-        ];
-      } else {
-        droneState.current.altitude = Math.max(0, droneState.current.altitude - 0.4);
-        droneState.current.speed = Math.max(0, droneState.current.speed - 0.15);
-        droneState.current.pitch *= 0.82;
-        droneState.current.roll *= 0.82;
-        droneState.current.yaw *= 0.82;
-        droneState.current.motorRPMs = [0, 0, 0, 0];
-      }
+      const baselineRPM = 7500 + droneState.current.altitude * 60;
+      droneState.current.motorRPMs = [
+        Math.round(baselineRPM + Math.sin(time * 8) * 150 + droneState.current.roll * 15),
+        Math.round(baselineRPM + Math.cos(time * 8) * 150 - droneState.current.roll * 15),
+        Math.round(baselineRPM - Math.sin(time * 8) * 150 + droneState.current.pitch * 15),
+        Math.round(baselineRPM - Math.cos(time * 8) * 150 - droneState.current.pitch * 15),
+      ];
 
-      if (Math.floor(time * 60) % 6 === 0) {
-        onTelemetryUpdate({
+      if (Math.floor(time * 60) % 6 === 0 && onTelemetryUpdateRef.current) {
+        onTelemetryUpdateRef.current({
           altitude: parseFloat(droneState.current.altitude.toFixed(2)),
           speed: parseFloat(droneState.current.speed.toFixed(2)),
           heading: droneState.current.heading,
@@ -226,23 +292,20 @@ export const WireframeDrone: React.FC<WireframeDroneProps> = ({
         });
       }
 
-      // Setup Rotation Matrix around Camera's View Axis (Spherical Pitch/Yaw)
-      const cosP = Math.cos(cameraRot.pitch);
-      const sinP = Math.sin(cameraRot.pitch);
-      const cosY = Math.cos(cameraRot.yaw);
-      const sinY = Math.sin(cameraRot.yaw);
+      // Camera Spherical Projection
+      const cosP = Math.cos(cameraRot.current.pitch);
+      const sinP = Math.sin(cameraRot.current.pitch);
+      const cosY = Math.cos(cameraRot.current.yaw);
+      const sinY = Math.sin(cameraRot.current.yaw);
 
-      // Project 3D coordinate to 2D Screen Canvas
       const project = (pt: Point3D): { x: number; y: number } => {
-        // Drone self-rotation matrices
-        const dCosP = Math.cos(droneState.current.pitch * Math.PI / 180);
-        const dSinP = Math.sin(droneState.current.pitch * Math.PI / 180);
-        const dCosR = Math.cos(droneState.current.roll * Math.PI / 180);
-        const dSinR = Math.sin(droneState.current.roll * Math.PI / 180);
-        const dCosY = Math.cos(droneState.current.yaw * Math.PI / 180);
-        const dSinY = Math.sin(droneState.current.yaw * Math.PI / 180);
+        const dCosP = Math.cos((droneState.current.pitch * Math.PI) / 180);
+        const dSinP = Math.sin((droneState.current.pitch * Math.PI) / 180);
+        const dCosR = Math.cos((droneState.current.roll * Math.PI) / 180);
+        const dSinR = Math.sin((droneState.current.roll * Math.PI) / 180);
+        const dCosY = Math.cos((droneState.current.yaw * Math.PI) / 180);
+        const dSinY = Math.sin((droneState.current.yaw * Math.PI) / 180);
 
-        // Yaw -> Pitch -> Roll
         let x1 = pt.x * dCosY - pt.y * dSinY;
         let y1 = pt.x * dSinY + pt.y * dCosY;
         let z1 = pt.z;
@@ -255,28 +318,26 @@ export const WireframeDrone: React.FC<WireframeDroneProps> = ({
         let y3 = y2;
         let z3 = -x2 * dSinR + z2 * dCosR;
 
-        // Hover offset translation
         z3 -= Math.min(20, droneState.current.altitude * 1.6);
 
-        // Camera orbit translation
         let cx = x3 * cosY - y3 * sinY;
         let cy = x3 * sinY + y3 * cosY;
-        let cz = -z3; // Correct 3D orientation so the drone is right side up
+        let cz = -z3;
 
         let finalX = cx;
         let finalY = cy * cosP - cz * sinP;
         let finalZ = cy * sinP + cz * cosP;
 
         const distance = 260;
-        const depthScale = distance / (distance + finalZ * zoom * 0.08);
-        
+        const depthScale = distance / (distance + finalZ * effectiveZoom * 0.08);
+
         return {
-          x: centerX + finalX * zoom * depthScale,
-          y: centerY + finalY * zoom * depthScale,
+          x: centerX + finalX * effectiveZoom * depthScale,
+          y: centerY + finalY * effectiveZoom * depthScale,
         };
       };
 
-      // Draw elegant concentric horizontal radar circles below drone on the "ground"
+      // Draw horizontal ground radar grid circles
       ctx.strokeStyle = "rgba(147, 197, 253, 0.06)";
       ctx.lineWidth = 1;
       const groundZ = 35;
@@ -313,21 +374,18 @@ export const WireframeDrone: React.FC<WireframeDroneProps> = ({
       ctx.lineWidth = 1.5;
       ctx.strokeStyle = mainWireColor(0.85);
 
-      // Upper canopy ring
       ctx.beginPath();
       ctx.moveTo(projUpper[0].x, projUpper[0].y);
       for (let i = 1; i < projUpper.length; i++) ctx.lineTo(projUpper[i].x, projUpper[i].y);
       ctx.closePath();
       ctx.stroke();
 
-      // Lower frame loop
       ctx.beginPath();
       ctx.moveTo(projLower[0].x, projLower[0].y);
       for (let i = 1; i < projLower.length; i++) ctx.lineTo(projLower[i].x, projLower[i].y);
       ctx.closePath();
       ctx.stroke();
 
-      // Vertical structural ribs connecting upper and lower decks
       ctx.strokeStyle = mainWireColor(0.3);
       ctx.lineWidth = 1;
       ctx.beginPath();
@@ -337,7 +395,6 @@ export const WireframeDrone: React.FC<WireframeDroneProps> = ({
       }
       ctx.stroke();
 
-      // Sleek diagonal structural cross on nose
       ctx.strokeStyle = strokeColorAlpha(0.6);
       ctx.beginPath();
       ctx.moveTo(projUpper[0].x, projUpper[0].y);
@@ -346,69 +403,58 @@ export const WireframeDrone: React.FC<WireframeDroneProps> = ({
       ctx.lineTo(projLower[0].x, projLower[0].y);
       ctx.stroke();
 
-      // 2. Draw Battery Prismatic Box
+      // 2. Draw Battery Pack
       ctx.strokeStyle = mainWireColor(0.4);
       ctx.lineWidth = 1;
-      // Bottom loop
       ctx.beginPath();
       ctx.moveTo(projBattery[0].x, projBattery[0].y);
       for (let i = 1; i < 4; i++) ctx.lineTo(projBattery[i].x, projBattery[i].y);
       ctx.closePath();
       ctx.stroke();
-      // Top loop
+
       ctx.beginPath();
       ctx.moveTo(projBattery[4].x, projBattery[4].y);
       for (let i = 5; i < 8; i++) ctx.lineTo(projBattery[i].x, projBattery[i].y);
       ctx.closePath();
       ctx.stroke();
-      // Pillars
+
       ctx.beginPath();
       for (let i = 0; i < 4; i++) {
         ctx.moveTo(projBattery[i].x, projBattery[i].y);
-        ctx.lineTo(projBattery[i+4].x, projBattery[i+4].y);
+        ctx.lineTo(projBattery[i + 4].x, projBattery[i + 4].y);
       }
       ctx.stroke();
 
-      // 3. Draw Dynamic Stabilization Camera Gimbal under nose
-      // Center gimbal pivot: { x: 0, y: -6, z: 4 }
-      // Actively stabilized gimbal angle (opposing pitch and roll)
-      const gimbalPitch = -droneState.current.pitch * 0.7 * Math.PI / 180;
-      const gimbalRoll = -droneState.current.roll * 0.7 * Math.PI / 180;
+      // 3. Draw Stabilization Camera Gimbal
+      const gimbalPitch = (-droneState.current.pitch * 0.7 * Math.PI) / 180;
+      const gimbalRoll = (-droneState.current.roll * 0.7 * Math.PI) / 180;
 
       const gimbalPivot: Point3D = { x: 0, y: -6, z: 4 };
       const projPivot = project(gimbalPivot);
 
-      // Draw camera pod housing as a 3D sphere-like cage
-      ctx.strokeStyle = strokeColorAlpha(0.8);
-      ctx.lineWidth = 1.2;
-      const podRadius = 3.5;
-      
-      // Draw camera lens cylinder extending forward relative to active gimbal tilt
       const cosGP = Math.cos(gimbalPitch);
       const sinGP = Math.sin(gimbalPitch);
-      const cosGR = Math.cos(gimbalRoll);
       const sinGR = Math.sin(gimbalRoll);
 
-      // Camera lens tip relative to gimbal pivot
       const lensRel: Point3D = {
         x: sinGR * 5,
         y: -cosGP * 6,
-        z: sinGP * 5
+        z: sinGP * 5,
       };
       const cameraLensEnd: Point3D = {
         x: gimbalPivot.x + lensRel.x,
         y: gimbalPivot.y + lensRel.y,
-        z: gimbalPivot.z + lensRel.z
+        z: gimbalPivot.z + lensRel.z,
       };
       const projLensEnd = project(cameraLensEnd);
 
-      // Draw Gimbal neck strut
+      ctx.strokeStyle = strokeColorAlpha(0.8);
+      ctx.lineWidth = 1.2;
       ctx.beginPath();
       ctx.moveTo(project({ x: 0, y: -6, z: 2.5 }).x, project({ x: 0, y: -6, z: 2.5 }).y);
       ctx.lineTo(projPivot.x, projPivot.y);
       ctx.stroke();
 
-      // Draw Camera Lens Tube
       ctx.strokeStyle = strokeColorAlpha(1);
       ctx.lineWidth = 2.5;
       ctx.beginPath();
@@ -416,21 +462,19 @@ export const WireframeDrone: React.FC<WireframeDroneProps> = ({
       ctx.lineTo(projLensEnd.x, projLensEnd.y);
       ctx.stroke();
 
-      // Small high-gloss camera glass aperture ring at the tip
       ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
       ctx.beginPath();
       ctx.arc(projLensEnd.x, projLensEnd.y, 2, 0, 2 * Math.PI);
       ctx.fill();
 
-      // 4. Draw Double-Tube Truss Arms (Wide Cinematic Cinewhoop Style)
+      // 4. Draw Truss Arms
       ctx.lineWidth = 1.8;
-      
+
       const drawTrussArm = (deckAttach1: Point3D, deckAttach2: Point3D, motorHub: Point3D, isFront: boolean) => {
         const pAttach1 = project(deckAttach1);
         const pAttach2 = project(deckAttach2);
         const pHub = project(motorHub);
 
-        // Two primary arm support tubes
         ctx.strokeStyle = isFront ? strokeColorAlpha(0.85) : mainWireColor(0.5);
         ctx.beginPath();
         ctx.moveTo(pAttach1.x, pAttach1.y);
@@ -439,7 +483,6 @@ export const WireframeDrone: React.FC<WireframeDroneProps> = ({
         ctx.lineTo(pHub.x, pHub.y);
         ctx.stroke();
 
-        // Structural lattice trusses between the two tubes
         ctx.strokeStyle = mainWireColor(0.2);
         ctx.lineWidth = 0.8;
         const trussSteps = 4;
@@ -462,23 +505,16 @@ export const WireframeDrone: React.FC<WireframeDroneProps> = ({
           ctx.lineTo(projPt2.x, projPt2.y);
         }
         ctx.stroke();
-        ctx.lineWidth = 1.8; // restore
+        ctx.lineWidth = 1.8;
       };
 
-      // Front Left Arm
       drawTrussArm(upperDeck[7], lowerDeck[6], armEndpoints.fl, true);
-      // Front Right Arm
       drawTrussArm(upperDeck[2], lowerDeck[2], armEndpoints.fr, true);
-      // Rear Left Arm
       drawTrussArm(upperDeck[5], lowerDeck[5], armEndpoints.rl, false);
-      // Rear Right Arm
       drawTrussArm(upperDeck[4], lowerDeck[4], armEndpoints.rr, false);
 
-      // 5. Draw 3D Cylindrical Motor Housings and ducted Rotor Guard Rings
+      // 5. Draw Motors & Rotor Guards
       const drawMotorAndDuct = (hub: Point3D, isFront: boolean) => {
-        const projHub = project(hub);
-
-        // Cylindrical motor body canister
         const motorTop: Point3D = { x: hub.x, y: hub.y, z: hub.z - 2.5 };
         const motorBottom: Point3D = { x: hub.x, y: hub.y, z: hub.z + 2.5 };
         const projMTop = project(motorTop);
@@ -491,8 +527,6 @@ export const WireframeDrone: React.FC<WireframeDroneProps> = ({
         ctx.lineTo(projMBot.x, projMBot.y);
         ctx.stroke();
 
-        // Draw Propeller Duct Guard Ring surrounding the motor
-        // Large outer carbon circle
         const ductRadius = 13.5;
         ctx.strokeStyle = isFront ? strokeColorAlpha(0.4) : mainWireColor(0.2);
         ctx.lineWidth = 1.5;
@@ -503,7 +537,7 @@ export const WireframeDrone: React.FC<WireframeDroneProps> = ({
           const p = project({
             x: hub.x + Math.cos(rad) * ductRadius,
             y: hub.y + Math.sin(rad) * ductRadius,
-            z: hub.z - 1.0
+            z: hub.z - 1.0,
           });
           if (a === 0) ctx.moveTo(p.x, p.y);
           else ctx.lineTo(p.x, p.y);
@@ -511,7 +545,6 @@ export const WireframeDrone: React.FC<WireframeDroneProps> = ({
         ctx.closePath();
         ctx.stroke();
 
-        // Duct spokes holding it to the motor hub (3 spokes spaced 120deg)
         ctx.strokeStyle = mainWireColor(0.15);
         ctx.lineWidth = 0.8;
         ctx.beginPath();
@@ -520,7 +553,7 @@ export const WireframeDrone: React.FC<WireframeDroneProps> = ({
           const outerP = project({
             x: hub.x + Math.cos(rad) * ductRadius,
             y: hub.y + Math.sin(rad) * ductRadius,
-            z: hub.z - 1.0
+            z: hub.z - 1.0,
           });
           ctx.moveTo(projMTop.x, projMTop.y);
           ctx.lineTo(outerP.x, outerP.y);
@@ -533,21 +566,20 @@ export const WireframeDrone: React.FC<WireframeDroneProps> = ({
       drawMotorAndDuct(armEndpoints.rl, false);
       drawMotorAndDuct(armEndpoints.rr, false);
 
-      // 6. Draw High-Fidelity Detailed Spinning Propeller Blades
+      // 6. Draw Spinning Propeller Blades
       const drawHighFidelityRotor = (hub: Point3D, color: string, index: number) => {
-        const propHeight = hub.z - 3.2; // sitting slightly above motor
+        const propHeight = hub.z - 3.2;
         const propCenter: Point3D = { x: hub.x, y: hub.y, z: propHeight };
         const projCenter = project(propCenter);
 
         const propRadius = 10.5;
-        // Swept propeller blade 1 tip and trailing edges
-        const rad1 = rotorPhase + (index * Math.PI / 2);
+        const rad1 = rotorPhase + (index * Math.PI) / 2;
         const rad2 = rad1 + Math.PI;
 
         const tip1: Point3D = {
           x: hub.x + Math.cos(rad1) * propRadius,
           y: hub.y + Math.sin(rad1) * propRadius,
-          z: propHeight - 0.5, // dynamic aerodynamic dihedral chord
+          z: propHeight - 0.5,
         };
         const tip2: Point3D = {
           x: hub.x + Math.cos(rad2) * propRadius,
@@ -558,25 +590,22 @@ export const WireframeDrone: React.FC<WireframeDroneProps> = ({
         const projTip1 = project(tip1);
         const projTip2 = project(tip2);
 
-        // Translucent rotor disc spinning motion blur sweep
         ctx.strokeStyle = "rgba(255, 255, 255, 0.16)";
         ctx.lineWidth = 1;
         ctx.beginPath();
         const diskRadiusProj = Math.abs(project({ ...propCenter, x: propCenter.x + propRadius }).x - projCenter.x);
-        ctx.ellipse(projCenter.x, projCenter.y, diskRadiusProj, diskRadiusProj * 0.4, 0, 0, 2 * Math.PI);
+        ctx.ellipse(projCenter.x, projCenter.y, Math.max(1, diskRadiusProj), Math.max(1, diskRadiusProj * 0.4), 0, 0, 2 * Math.PI);
         ctx.stroke();
 
-        // 3D physical wing blades (triangular outline chord to look like carbon fiber blades)
         ctx.strokeStyle = color;
         ctx.fillStyle = "rgba(255, 255, 255, 0.2)";
         ctx.lineWidth = 1.8;
 
-        // Blade 1 loop
-        const bladeOffsetAngle = 0.18; // chord thickness width
+        const bladeOffsetAngle = 0.18;
         const trailingEdge1: Point3D = {
           x: hub.x + Math.cos(rad1 - bladeOffsetAngle) * (propRadius * 0.75),
           y: hub.y + Math.sin(rad1 - bladeOffsetAngle) * (propRadius * 0.75),
-          z: propHeight + 0.3
+          z: propHeight + 0.3,
         };
         const projT1 = project(trailingEdge1);
 
@@ -588,11 +617,10 @@ export const WireframeDrone: React.FC<WireframeDroneProps> = ({
         ctx.fill();
         ctx.stroke();
 
-        // Blade 2 loop
         const trailingEdge2: Point3D = {
           x: hub.x + Math.cos(rad2 - bladeOffsetAngle) * (propRadius * 0.75),
           y: hub.y + Math.sin(rad2 - bladeOffsetAngle) * (propRadius * 0.75),
-          z: propHeight + 0.3
+          z: propHeight + 0.3,
         };
         const projT2 = project(trailingEdge2);
 
@@ -604,7 +632,6 @@ export const WireframeDrone: React.FC<WireframeDroneProps> = ({
         ctx.fill();
         ctx.stroke();
 
-        // Core central spinner spinner dome cap
         ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
         ctx.beginPath();
         ctx.arc(projCenter.x, projCenter.y, 2.2, 0, 2 * Math.PI);
@@ -616,29 +643,25 @@ export const WireframeDrone: React.FC<WireframeDroneProps> = ({
       drawHighFidelityRotor(armEndpoints.rl, mainWireColor(0.75), 2);
       drawHighFidelityRotor(armEndpoints.rr, mainWireColor(0.75), 3);
 
-      // 7. Draw Carbon Landing Stilts and Feet Pads
+      // 7. Draw Landing Stilts
       ctx.lineWidth = 1.5;
-      ctx.strokeStyle = mainWireColor(0.4);
       landingLegs.forEach((leg) => {
         const pStart = project(leg.start);
         const pJoint = project(leg.joint);
         const pFoot = project(leg.foot);
 
-        // draw hip connection segment
         ctx.strokeStyle = mainWireColor(0.5);
         ctx.beginPath();
         ctx.moveTo(pStart.x, pStart.y);
         ctx.lineTo(pJoint.x, pJoint.y);
         ctx.stroke();
 
-        // draw shock absorber stilt to foot
         ctx.strokeStyle = strokeColorAlpha(0.7);
         ctx.beginPath();
         ctx.moveTo(pJoint.x, pJoint.y);
         ctx.lineTo(pFoot.x, pFoot.y);
         ctx.stroke();
 
-        // Draw small horizontal circular foot pad
         ctx.strokeStyle = mainWireColor(0.6);
         ctx.beginPath();
         const fp1 = project({ x: leg.foot.x - 1.5, y: leg.foot.y, z: leg.foot.z });
@@ -648,7 +671,7 @@ export const WireframeDrone: React.FC<WireframeDroneProps> = ({
         ctx.stroke();
       });
 
-      // Directional Nose Arrow vector indicator (flickering cool light blue path)
+      // Directional Nose Arrow vector indicator
       const pCenter = project({ x: 0, y: 0, z: 0 });
       const pHeading = project({ x: 0, y: -45, z: 0 });
       ctx.strokeStyle = "rgba(147, 197, 253, 0.5)";
@@ -658,9 +681,9 @@ export const WireframeDrone: React.FC<WireframeDroneProps> = ({
       ctx.moveTo(pCenter.x, pCenter.y);
       ctx.lineTo(pHeading.x, pHeading.y);
       ctx.stroke();
-      ctx.setLineDash([]); // reset
+      ctx.setLineDash([]);
 
-      // Static crosshairs in dead center
+      // Static crosshairs in center
       ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
       ctx.beginPath();
       ctx.moveTo(centerX - 10, centerY);
@@ -669,17 +692,21 @@ export const WireframeDrone: React.FC<WireframeDroneProps> = ({
       ctx.lineTo(centerX, centerY + 10);
       ctx.stroke();
 
-      // UI Text overlay stats
-      ctx.font = "8px monospace";
-      ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+      // Responsive UI Text overlay telemetry stats
+      const fontSize = Math.max(8, Math.min(10, Math.floor(w / 42)));
+      ctx.font = `${fontSize}px monospace`;
+      ctx.fillStyle = "rgba(255, 255, 255, 0.45)";
+      const pad = 12;
+      const bY = h - 12;
+
       ctx.textAlign = "left";
-      ctx.fillText(`PITCH: ${droneState.current.pitch.toFixed(1)}°`, 16, h - 45);
-      ctx.fillText(`ROLL: ${droneState.current.roll.toFixed(1)}°`, 16, h - 33);
-      ctx.fillText(`YAW: ${droneState.current.yaw.toFixed(1)}°`, 16, h - 21);
+      ctx.fillText(`PITCH: ${droneState.current.pitch.toFixed(1)}°`, pad, bY - fontSize * 2 - 4);
+      ctx.fillText(`ROLL: ${droneState.current.roll.toFixed(1)}°`, pad, bY - fontSize - 2);
+      ctx.fillText(`YAW: ${droneState.current.yaw.toFixed(1)}°`, pad, bY);
 
       ctx.textAlign = "right";
-      ctx.fillText(`HEADING: ${droneState.current.heading}°`, w - 16, h - 33);
-      ctx.fillText(`HEIGHT: ${droneState.current.altitude.toFixed(1)}M`, w - 16, h - 21);
+      ctx.fillText(`HEADING: ${droneState.current.heading}°`, w - pad, bY - fontSize - 2);
+      ctx.fillText(`ALTITUDE: ${droneState.current.altitude.toFixed(1)}M`, w - pad, bY);
 
       animationId = requestAnimationFrame(render);
     };
@@ -688,34 +715,33 @@ export const WireframeDrone: React.FC<WireframeDroneProps> = ({
 
     return () => {
       cancelAnimationFrame(animationId);
-      window.removeEventListener("resize", resizeCanvas);
+      if (resizeObserver) resizeObserver.disconnect();
     };
-  }, [isArmed, flightMode, cameraRot, zoom, pidP, pidI, pidD]);
+  }, [isArmed, flightMode, pidP, pidI, pidD]);
 
   return (
-    <div className="relative w-full h-full bg-stone-950/80 flex flex-col justify-between overflow-hidden">
-      {/* Simulation Watermark / Borders */}
-      <div className="absolute top-4 left-4 flex items-center gap-2 z-10 select-none font-mono">
-        <span className="inline-block w-2.5 h-2.5 rounded-none bg-stone-100 animate-pulse"></span>
-        <span className="text-[10px] text-stone-100 tracking-widest font-bold font-mono">REAL-TIME FLIGHT ROTATOR</span>
+    <div className="relative w-full h-full bg-stone-950/90 flex flex-col justify-between overflow-hidden touch-none select-none">
+      {/* Simulation Watermark / Header */}
+      <div className="absolute top-3 left-3 flex items-center gap-2 z-10 select-none font-mono">
+        <span className="inline-block w-2 h-2 rounded-none bg-sky-400 animate-pulse"></span>
+        <span className="text-[9px] text-stone-200 tracking-wider font-bold font-mono">REAL-TIME 3D ROTATOR</span>
       </div>
 
-      <div className="absolute top-4 right-4 font-mono text-[9px] text-stone-500 z-10 select-none tracking-wider">
-        CORE-MATRIX_PROJ_2.0
+      <div className="absolute top-3 right-3 font-mono text-[8px] text-stone-500 z-10 select-none tracking-wider">
+        CHRONO-MESH_2.0
       </div>
 
       <canvas
-         ref={canvasRef}
-         onMouseDown={handleMouseDown}
-         onMouseMove={handleMouseMove}
-         onMouseUp={handleMouseUpOrLeave}
-         onMouseLeave={handleMouseUpOrLeave}
-         onWheel={handleWheel}
-         className="w-full h-full cursor-grab active:cursor-grabbing touch-none block"
+        ref={canvasRef}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUpOrCancel}
+        onPointerCancel={handlePointerUpOrCancel}
+        className="w-full h-full cursor-grab active:cursor-grabbing touch-none block"
       />
 
-      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 font-mono text-[9px] text-stone-600 pointer-events-none text-center select-none uppercase tracking-[0.2em]">
-        DRAG MOUSE OR SWIPE TO ROTATE VIEW
+      <div className="absolute bottom-2 left-1/2 -translate-x-1/2 font-mono text-[8px] text-stone-500 pointer-events-none text-center select-none uppercase tracking-[0.15em] whitespace-nowrap bg-stone-950/60 px-2 py-0.5 rounded">
+        DRAG / PINCH TO ROTATE & ZOOM
       </div>
     </div>
   );
